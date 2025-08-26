@@ -84,7 +84,8 @@
 
   <div class="game-container">
     <div class="game-board">
-      <canvas id="gameCanvas" width="300" height="600"></canvas>
+      <!-- tabindex makes canvas focusable -->
+      <canvas id="gameCanvas" width="300" height="600" tabindex="0"></canvas>
 
       <!-- Overlays -->
       <div class="paused" id="pausedOverlay">
@@ -162,6 +163,11 @@
     let score = 0, level = 1, lines = 0;
     let dropCounter = 0, dropInterval = 1000;
     let lastTime = 0;
+
+    // Focus helper
+    function focusCanvas() {
+      setTimeout(() => canvas.focus(), 0);
+    }
 
     // Init board
     function initBoard() {
@@ -306,6 +312,7 @@
       restartBtn.disabled = false;
 
       requestAnimationFrame(gameLoop);
+      focusCanvas(); // keep keys working
     }
 
     function togglePause() {
@@ -313,8 +320,7 @@
       isPaused = !isPaused;
       pausedOverlay.style.display = isPaused ? 'block' : 'none';
       pauseBtn.textContent = isPaused ? 'Resume' : 'Pause';
-      // Reset lastTime to avoid a big delta after pause
-      if (!isPaused) { lastTime = 0; }
+      if (!isPaused) { lastTime = 0; focusCanvas(); } // refocus on resume
     }
 
     function restartGame() {
@@ -335,13 +341,13 @@
       pausedOverlay.style.display = 'none';
 
       requestAnimationFrame(gameLoop);
+      focusCanvas();
     }
 
     // ---- Main loop with delta-time fix ----
     function gameLoop(timestamp = 0) {
       if (!gameRunning) return;
 
-      // If resuming from pause or first frame, avoid giant delta
       if (lastTime === 0) lastTime = timestamp;
       const delta = timestamp - lastTime;
       lastTime = timestamp;
@@ -372,6 +378,11 @@
 
     // ---- Keyboard controls ----
     document.addEventListener('keydown', (e) => {
+      // Prevent browser handling for our keys
+      if (['ArrowLeft','ArrowRight','ArrowDown','ArrowUp',' ','p','P'].includes(e.key)) {
+        e.preventDefault();
+      }
+
       // Global pause toggle
       if (e.key === 'p' || e.key === 'P') {
         togglePause();
@@ -398,14 +409,13 @@
           break;
         }
         case ' ':
-          e.preventDefault();
           while (isValidMove(currentPiece, 0, 1)) {
             currentPiece.y++; score += 2;
           }
           updateDisplay();
           break;
       }
-    });
+    }, { passive: false });
 
     // ---- Touch controls ----
     let touchStartX = 0, touchStartY = 0;
@@ -444,21 +454,16 @@
       }
     });
 
-    // ---- Wire buttons ----
-    startBtn.addEventListener('click', startGame);
-    pauseBtn.addEventListener('click', togglePause);
-    restartBtn.addEventListener('click', restartGame);
-    restartBtnOverlay.addEventListener('click', restartGame);
+    // ---- Wire buttons (blur to avoid sticky focus) ----
+    startBtn.addEventListener('click', () => { startGame(); startBtn.blur(); focusCanvas(); });
+    pauseBtn.addEventListener('click', () => { togglePause(); pauseBtn.blur(); if (!isPaused) focusCanvas(); });
+    restartBtn.addEventListener('click', () => { restartGame(); restartBtn.blur(); focusCanvas(); });
+    restartBtnOverlay.addEventListener('click', () => { restartGame(); restartBtnOverlay.blur(); focusCanvas(); });
 
     // ---- Initial setup (do not auto-start) ----
     initBoard();
     drawBoard();
     updateDisplay();
-
-    // Helpful: space key shouldn't scroll page if canvas focused
-    window.addEventListener('keydown', (e) => {
-      if (e.code === 'Space') e.preventDefault();
-    }, { passive: false });
   </script>
 </body>
 </html>
